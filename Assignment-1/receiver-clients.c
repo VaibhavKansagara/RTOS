@@ -8,42 +8,38 @@
 #include<unistd.h> // for close
 #include<pthread.h>
 #include<signal.h>
+#include"common.h"
 
 int sockfd;
+long long total_delay = 0, n = 0;
+
 void handle_sigint(int sig) {
-    char buff[500];
+    FILE *filepointer = fopen("test_results.txt", "a");
+    fprintf(filepointer, "%lf\n", ((double)total_delay)/(double)n);
+    fclose(filepointer);
+    char buff[10];
     memset(buff, '\0', sizeof(buff));
-    char temp;
-    printf("exit Y/N: ");
-    scanf("%c", &temp);
     strcpy(buff, "exit");
-    if (temp == 'Y' || temp == 'y') {
-        send(sockfd, buff, sizeof(buff), 0);
-        exit(0);
-    }
+    struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
+    t_m->t = gettime();
+    strcpy(t_m->buff, buff);
+    send(sockfd, t_m, sizeof(struct time_message), 0);
+    exit(0);
 }
 
-void* send_thread_func(void *fd) {
-    // create a signal handler which deals when the client presses ctrl+c
-    signal(SIGINT, handle_sigint);
-
-    int sckfd = *((int *)fd);
-    char buff[500];
-    while(1) {
-        memset(buff, '\0', sizeof(buff));
-        printf("Enter your message: ");
-        fgets(buff, 500, stdin);
-        send(sckfd, buff, sizeof(buff), 0);
-    }
-}
 
 void* rcv_thread_func(void *fd) {
     int sckfd = *((int *)fd);
-    char buff[500];
     while(1) {
-        memset(buff, '\0', sizeof(buff));
-        recv(sckfd, buff, sizeof(buff), 0);
-        printf("%s", buff);
+        struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
+        recv(sckfd, t_m, sizeof(struct time_message), 0);
+        struct t_format curr_time = gettime();
+        long long delay = abs(timediff(t_m->t, curr_time));
+        if (n < 100) {
+            total_delay += delay;
+            n++;
+        }
+        usleep(1000);
     }
 }
 
@@ -71,38 +67,26 @@ int main(int argc, char* argv[]) {
         printf("connection established successfully\n");
 
         char buff[500];
-        int read;
         memset(buff, '\0', sizeof(buff));
         recv(sockfd, buff, sizeof(buff), 0);
-        // buff[read] = '\0';
         printf("%s\n", buff);
         
         memset(buff, '\0', sizeof(buff));
         recv(sockfd, buff, sizeof(buff), 0);
         printf("%s\n", buff);
 
-        memset(buff, '\0', sizeof(buff));
-        scanf("%s", buff);
-        send(sockfd, buff, sizeof(buff), 0);
+        send(sockfd, argv[3], sizeof(argv[3]), 0);
 
         memset(buff, '\0', sizeof(buff));
         recv(sockfd, buff, sizeof(buff), 0);
         printf("%s\n", buff);
 
-        memset(buff, '\0', sizeof(buff));
-        scanf("%s", buff);
-        send(sockfd, buff, sizeof(buff), 0);
+        send(sockfd, argv[4], sizeof(argv[4]), 0);
     }
 
-    // Create two threads - one for recieving messages and one for sending message
-    // to the server.
-    pthread_t send_threadid;
     pthread_t rcv_threadid;
-    pthread_create(&send_threadid, NULL, send_thread_func, &sockfd);
     pthread_create(&rcv_threadid, NULL, rcv_thread_func, &sockfd);
-
-    // join the two threads
-    pthread_join(send_threadid, NULL);
+    signal(SIGINT, handle_sigint);
     pthread_join(rcv_threadid, NULL);
     close(sockfd);
 }

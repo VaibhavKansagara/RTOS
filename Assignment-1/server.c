@@ -8,6 +8,7 @@
 #include<unistd.h> // for close
 #include<pthread.h>
 #include<signal.h>
+#include"common.h"
 
 #define handle_error(msg) \
            do { perror(msg); exit(EXIT_FAILURE); } while (0)
@@ -44,7 +45,8 @@ struct Message {
 
 // ------------------------------Queue implementation
 struct QNode { 
-    struct Message key; 
+    struct Message key;
+    struct t_format t;
     struct QNode* next; 
 };
 
@@ -126,7 +128,10 @@ void traverse(struct Client* head) {
             strncat(name, ": ", 2);
             strcpy(buff, name);
             strncat(buff, q->front->key.message, sizeof(q->front->key.message));
-            send(head->sck_id, buff, sizeof(buff), 0);
+            struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
+            t_m->t = q->front->t;
+            strcpy(t_m->buff, buff);
+            send(head->sck_id, t_m, sizeof(struct time_message), 0);
         } 
         head = head->next;
     }
@@ -186,9 +191,9 @@ void* client_thread(void* connfd) {
     // Now read the message from the client for infinite time
     // until he quits
     while(1) {
-        memset(buff, '\0', sizeof(buff));
-        recv(sckfd, buff, sizeof(buff), 0);
-        if (strcmp(buff, "exit") == 0) {
+        struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
+        recv(sckfd, t_m, sizeof(struct time_message), 0);
+        if (strcmp(t_m->buff, "exit") == 0) {
             delete(groups[client->group_id], client->sck_id);
             break;
         }
@@ -196,9 +201,10 @@ void* client_thread(void* connfd) {
         struct Message msg;
         strcpy(msg.client_name, client->name);
         msg.group_id = client->group_id;
-        strcpy(msg.message, buff);
+        strcpy(msg.message, t_m->buff);
         struct QNode* qnode = (struct QNode*)malloc(sizeof(struct QNode));
         qnode->key = msg;
+        qnode->t = t_m->t;
         qnode->next = NULL;
         pthread_mutex_lock(&q->q_lock);
         enQueue(qnode);
