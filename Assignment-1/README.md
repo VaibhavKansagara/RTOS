@@ -1,5 +1,13 @@
 # RTOS
 
+## Compile
+gcc server.c -o server -lpthread
+gcc client.c -o client -lpthread
+
+## Run
+./server <server_address> <port-no>
+./client <server_address> <port-no>
+
 ## Performance Measurement
 
 #### Some of the Results
