@@ -13,6 +13,8 @@
 #define handle_error(msg) \
            do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
+#define BUFSIZE 1024
+
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; 
 
 // initially voice chat is disabled.
@@ -39,7 +41,8 @@ void append(struct Client* head, struct Client* new_node) {
 }
 
 struct Message {
-    char message[500];
+    char message[BUFSIZE];
+    uint8_t voice_msg[BUFSIZE];
     int group_id;
     char client_name[50];
 };
@@ -122,7 +125,7 @@ void delete(struct Client* head, int id) {
 struct Client* groups[4];
 
 void traverse(struct Client* head) {
-    char buff[500];
+    char buff[BUFSIZE];
     while(head != NULL) {
         if (strcmp(head->name, q->front->key.client_name) != 0) {
             memset(buff, '\0', sizeof(buff));
@@ -134,6 +137,8 @@ void traverse(struct Client* head) {
             struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
             t_m->t = q->front->t;
             strcpy(t_m->buff, buff);
+            if (voice_chat)
+                memcpy(t_m->voice_buff, q->front->key.voice_msg, sizeof(t_m->voice_buff));
             send(head->sck_id, t_m, sizeof(struct time_message), 0);
         } 
         head = head->next;
@@ -157,7 +162,7 @@ void* client_thread(void* connfd) {
     int sckfd = *((int *)connfd);
 
     struct Client* client = (struct Client*)malloc(sizeof(struct Client));
-    char buff[500];
+    char buff[BUFSIZE];
 
     strcpy(buff, "Welcome to chatapp group\n");
     send(sckfd, buff, sizeof(buff), 0);
@@ -181,7 +186,6 @@ void* client_thread(void* connfd) {
     client->group_id = atoi(buff);
     client->sck_id = sckfd;
 
-    
     pthread_mutex_lock(&lock);
     // Add the client into the group
     if (groups[client->group_id] == NULL) {
@@ -204,6 +208,9 @@ void* client_thread(void* connfd) {
         struct Message msg;
         strcpy(msg.client_name, client->name);
         msg.group_id = client->group_id;
+        if (voice_chat) {
+            memcpy(msg.voice_msg, t_m->voice_buff, sizeof(t_m->voice_buff));
+        }
         strcpy(msg.message, t_m->buff);
         struct QNode* qnode = (struct QNode*)malloc(sizeof(struct QNode));
         qnode->key = msg;
@@ -269,7 +276,7 @@ void* main_thread_func(void* argv) {
 
     // join all the threads before terminating the main thread.
     for(int j = 0; j < i; j++) {
-        pthread_join(client_thread_ids[i++], NULL);
+        pthread_join(client_thread_ids[j], NULL);
     }
 
     // close the socket
@@ -283,7 +290,7 @@ int main(int argc, char* argv[]) {
 
     arg.sddr = argv[1];
     arg.portno = atoi(argv[2]);
-    voice_chat = argv[3];
+    voice_chat = atoi(argv[3]);
 
     pthread_create(&main_thread_id, NULL, main_thread_func, (void *) &arg);
     pthread_create(&queue_proc_thread_id, NULL, queue_thread_func, &queue_proc_thread_id);
