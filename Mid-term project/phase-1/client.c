@@ -12,6 +12,7 @@
 #include <pulse/simple.h>
 #include <pulse/error.h>
 #include <pulse/gccmacro.h>
+#include <pulse/pulseaudio.h>
 
 #define BUFSIZE 512
 
