@@ -16,7 +16,7 @@ void handle_sigint(int sig) {
     memset(buff, '\0', sizeof(buff));
     char temp;
     printf("exit Y/N: ");
-    scanf("%c", &temp);
+    scanf("%s", &temp);
     strcpy(buff, "exit");
     struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
     strcpy(t_m->buff, buff);

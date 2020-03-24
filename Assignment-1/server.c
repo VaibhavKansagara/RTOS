@@ -121,7 +121,7 @@ struct Client* groups[4];
 void traverse(struct Client* head) {
     char buff[500];
     while(head != NULL) {
-        if (strcmp(head->name, q->front->key.client_name) != 0) {
+        if ((head->sck_id != 0) && (strcmp(head->name, q->front->key.client_name) != 0)) {
             memset(buff, '\0', sizeof(buff));
             char name[30];
             strcpy(name, q->front->key.client_name);
@@ -266,7 +266,7 @@ void* main_thread_func(void* argv) {
 
     // join all the threads before terminating the main thread.
     for(int j = 0; j < i; j++) {
-        pthread_join(client_thread_ids[i++], NULL);
+        pthread_join(client_thread_ids[j], NULL);
     }
 
     // close the socket

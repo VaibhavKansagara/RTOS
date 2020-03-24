@@ -75,7 +75,7 @@ struct Queue* createQueue()
 } 
 
 void enQueue(struct QNode* new) 
-{ 
+{
     // If queue is empty, then new node is front and rear both 
     if (q->rear == NULL) { 
         q->front = q->rear = new; 
@@ -84,7 +84,7 @@ void enQueue(struct QNode* new)
   
     // Add the new node at the end of queue and change rear 
     q->rear->next = new; 
-    q->rear = new; 
+    q->rear = new;
 } 
   
 // Function to remove a key from given queue q 
@@ -127,9 +127,9 @@ struct Client* groups[4];
 void traverse(struct Client* head) {
     char buff[BUFSIZE];
     while(head != NULL) {
-        if (strcmp(head->name, q->front->key.client_name) != 0) {
+        if ((head->sck_id != 0) && (strcmp(head->name, q->front->key.client_name) != 0)) {
             memset(buff, '\0', sizeof(buff));
-            char name[30];
+            char name[50];
             strcpy(name, q->front->key.client_name);
             strncat(name, ": ", 2);
             strcpy(buff, name);
@@ -185,7 +185,6 @@ void* client_thread(void* connfd) {
     recv(sckfd, buff, sizeof(buff), 0);
     client->group_id = atoi(buff);
     client->sck_id = sckfd;
-
     pthread_mutex_lock(&lock);
     // Add the client into the group
     if (groups[client->group_id] == NULL) {
@@ -194,7 +193,6 @@ void* client_thread(void* connfd) {
         append(groups[client->group_id], client);
     }
     pthread_mutex_unlock(&lock);
-
     // Now read the message from the client for infinite time
     // until he quits
     while(1) {
@@ -211,7 +209,9 @@ void* client_thread(void* connfd) {
         if (voice_chat) {
             memcpy(msg.voice_msg, t_m->voice_buff, sizeof(t_m->voice_buff));
         }
-        strcpy(msg.message, t_m->buff);
+        else {
+            strcpy(msg.message, t_m->buff);
+        }
         struct QNode* qnode = (struct QNode*)malloc(sizeof(struct QNode));
         qnode->key = msg;
         qnode->t = t_m->t;
@@ -226,7 +226,7 @@ struct argument {
     char* sddr;
     int portno;
 } arg;
-    
+
 // Main thread will listen to the clients and form groups and
 // will be responsible for creating new client threads and
 // assigning them into their respective groups and also will be

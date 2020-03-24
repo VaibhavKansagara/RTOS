@@ -13,10 +13,17 @@
 #include <pulse/simple.h>
 #include <pulse/error.h>
 #include <pulse/gccmacro.h>
+#include <pulse/pulseaudio.h>
 
 #define BUFSIZE 1024
 
 int voice_chat = 0;
+
+// Create two threads - one for recieving messages and one for sending message
+// to the server.
+pthread_t send_threadid;
+pthread_t rcv_threadid;
+
 
 /* The sample type to use */
 static const pa_sample_spec ss1 = {
@@ -43,7 +50,7 @@ void handle_sigint(int sig) {
     memset(buff, '\0', sizeof(buff));
     char temp;
     printf("exit Y/N: ");
-    scanf("%c", &temp);
+    scanf("%s", &temp);
     strcpy(buff, "exit");
     struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
     strcpy(t_m->buff, buff);
@@ -55,11 +62,9 @@ void handle_sigint(int sig) {
 }
 
 void* send_thread_func(void *fd) {
-    // create a signal handler which deals when the client presses ctrl+c
-    signal(SIGINT, handle_sigint);
     if (voice_chat) {
         /* Create the recording stream */
-        if (!(s1 = pa_simple_new(NULL, NULL, PA_STREAM_RECORD, NULL, "record", &ss1, NULL, NULL, &error1))) {
+        if (!(s1 = pa_simple_new(NULL, "VOICE_CHAT", PA_STREAM_RECORD, NULL, "record", &ss1, NULL, NULL, &error1))) {
             fprintf(stderr, __FILE__": pa_simple_new() failed: %s\n", pa_strerror(error1));
             goto finish;
         }
@@ -69,7 +74,6 @@ void* send_thread_func(void *fd) {
     while(1) {
         char buff[BUFSIZE];
         uint8_t buff2[BUFSIZE];
-
         if (voice_chat) {
             /* Record some data ... */
             if (pa_simple_read(s1, buff2, sizeof(buff2), &error1) < 0) {
@@ -97,7 +101,7 @@ void* rcv_thread_func(void *fd) {
     int sckfd = *((int *)fd);
 
     /* Create a new playback stream */
-    if (!(s2 = pa_simple_new(NULL, NULL, PA_STREAM_PLAYBACK, NULL, "playback", &ss2, NULL, NULL, &error2))) {
+    if (!(s2 = pa_simple_new(NULL, "VOICE_CHAT", PA_STREAM_PLAYBACK, NULL, "playback", &ss2, NULL, NULL, &error2))) {
         fprintf(stderr, __FILE__": pa_simple_new() failed: %s\n", pa_strerror(error2));
         goto finish;
     }
@@ -115,17 +119,20 @@ void* rcv_thread_func(void *fd) {
             printf("%s", t_m->buff);
         }
     }
-    // /* Make sure that every single sample was played */
-    // if (pa_simple_drain(s2, &error) < 0) {
-    //     fprintf(stderr, __FILE__": pa_simple_drain() failed: %s\n", pa_strerror(error));
-    //     goto finish;
-    // }
+    /* Make sure that every single sample was played */
+    if (pa_simple_drain(s2, &error2) < 0) {
+        fprintf(stderr, __FILE__": pa_simple_drain() failed: %s\n", pa_strerror(error2));
+        goto finish;
+    }
 
 finish:
     if (s2) pa_simple_free(s2);
 }
 
 int main(int argc, char* argv[]) {
+    // create a signal handler which deals when the client presses ctrl+c
+    signal(SIGINT, handle_sigint);
+
     struct sockaddr_in serveraddr;
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -171,11 +178,6 @@ int main(int argc, char* argv[]) {
         scanf("%s", buff);
         send(sockfd, buff, sizeof(buff), 0);
     }
-
-    // Create two threads - one for recieving messages and one for sending message
-    // to the server.
-    pthread_t send_threadid;
-    pthread_t rcv_threadid;
 
     pthread_create(&send_threadid, NULL, send_thread_func, &sockfd);
     pthread_create(&rcv_threadid, NULL, rcv_thread_func, &sockfd);
