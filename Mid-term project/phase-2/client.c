@@ -15,7 +15,7 @@
 #include <pulse/gccmacro.h>
 #include <pulse/pulseaudio.h>
 
-#define BUFSIZE 1024
+#define BUFSIZE 512
 
 int voice_chat = 0;
 
