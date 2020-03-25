@@ -82,7 +82,7 @@ void* send_thread_func(void *fd) {
             }
         } else {
             printf("Enter your message: ");
-            fgets(buff, BUFSIZE, stdin);
+            scanf("%s", buff);
         }
 
         struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));

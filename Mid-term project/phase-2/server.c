@@ -20,6 +20,8 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 // initially voice chat is disabled.
 int voice_chat = 0;
 
+int sockfd;
+
 struct Client { 
     char name[50];
     int group_id;
@@ -47,6 +49,16 @@ struct Message {
     char client_name[50];
 };
 
+void handle_sigint(int sig) {
+    char temp;
+    printf("exit Y/N: ");
+    scanf("%s", &temp);
+    if (temp == 'Y' || temp == 'y') {
+        printf("Server exiting\n");
+        close(sockfd);
+        exit(0);
+    }
+}
 
 
 // ------------------------------Queue implementation
@@ -232,7 +244,7 @@ struct argument {
 // assigning them into their respective groups and also will be
 // responsible for deleting the clients.
 void* main_thread_func(void* argv) {
-    int sockfd, connfd, len;
+    int connfd, len;
     struct sockaddr_in serveraddr,cli;
     struct argument* args = (struct argument*) argv;
 
@@ -284,6 +296,7 @@ void* main_thread_func(void* argv) {
 }
 
 int main(int argc, char* argv[]) {
+    signal(SIGINT, handle_sigint);
     createQueue();
     pthread_t main_thread_id;
     pthread_t queue_proc_thread_id;

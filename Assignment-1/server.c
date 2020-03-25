@@ -10,10 +10,14 @@
 #include<signal.h>
 #include"common.h"
 
+#define BUFSIZE 512
+
 #define handle_error(msg) \
            do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; 
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_t client_thread_ids[100];
+int connection_fds[100];
 
 struct Client { 
     char name[50];
@@ -36,12 +40,12 @@ void append(struct Client* head, struct Client* new_node) {
 }
 
 struct Message {
-    char message[500];
+    char message[BUFSIZE];
     int group_id;
     char client_name[50];
 };
 
-
+int sockfd;
 
 // ------------------------------Queue implementation
 struct QNode { 
@@ -119,11 +123,11 @@ void delete(struct Client* head, int id) {
 struct Client* groups[4];
 
 void traverse(struct Client* head) {
-    char buff[500];
+    char buff[BUFSIZE];
     while(head != NULL) {
         if ((head->sck_id != 0) && (strcmp(head->name, q->front->key.client_name) != 0)) {
             memset(buff, '\0', sizeof(buff));
-            char name[30];
+            char name[50];
             strcpy(name, q->front->key.client_name);
             strncat(name, ": ", 2);
             strcpy(buff, name);
@@ -154,7 +158,7 @@ void* client_thread(void* connfd) {
     int sckfd = *((int *)connfd);
 
     struct Client* client = (struct Client*)malloc(sizeof(struct Client));
-    char buff[500];
+    char buff[BUFSIZE];
 
     strcpy(buff, "Welcome to chatapp group\n");
     send(sckfd, buff, sizeof(buff), 0);
@@ -222,7 +226,7 @@ struct argument {
 // assigning them into their respective groups and also will be
 // responsible for deleting the clients.
 void* main_thread_func(void* argv) {
-    int sockfd, connfd, len;
+    int connfd, len;
     struct sockaddr_in serveraddr,cli;
     struct argument* args = (struct argument*) argv;
 
@@ -251,7 +255,6 @@ void* main_thread_func(void* argv) {
     else
         printf("Server listening..\n");
 
-    pthread_t client_thread_ids[100];
     int i = 0;
     while(1) {
         socklen_t addrsize = sizeof(cli);
@@ -260,6 +263,7 @@ void* main_thread_func(void* argv) {
         } else printf("server accept failed\n");
         // Now create the thread for each client request accepted
         if(pthread_create(&client_thread_ids[i++], NULL, client_thread, &connfd) == 0) {
+            connection_fds[i-1] = connfd;
             printf("Thread created successfull\n");
         } else printf("Thread failed to create\n");
     }

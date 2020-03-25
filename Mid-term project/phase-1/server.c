@@ -46,8 +46,6 @@ int voice_chat = 0;
 
 
 void handle_sigint(int sig) {
-    char buff[BUFSIZE];
-    memset(buff, '\0', sizeof(buff));
     char temp;
     printf("exit Y/N: ");
     scanf("%s", &temp);

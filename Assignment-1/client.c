@@ -10,9 +10,11 @@
 #include<signal.h>
 #include "common.h"
 
+#define BUFSIZE 512
+
 int sockfd;
 void handle_sigint(int sig) {
-    char buff[500];
+    char buff[BUFSIZE];
     memset(buff, '\0', sizeof(buff));
     char temp;
     printf("exit Y/N: ");
@@ -28,15 +30,12 @@ void handle_sigint(int sig) {
 }
 
 void* send_thread_func(void *fd) {
-    // create a signal handler which deals when the client presses ctrl+c
-    signal(SIGINT, handle_sigint);
-
     int sckfd = *((int *)fd);
-    char buff[500];
+    char buff[BUFSIZE];
     while(1) {
         memset(buff, '\0', sizeof(buff));
         printf("Enter your message: ");
-        fgets(buff, 500, stdin);
+        scanf("%s", buff);
         struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
         strcpy(t_m->buff, buff);
         t_m->t = gettime();
@@ -55,6 +54,9 @@ void* rcv_thread_func(void *fd) {
 
 
 int main(int argc, char* argv[]) {
+    // create a signal handler which deals when the client presses ctrl+c
+    signal(SIGINT, handle_sigint);
+
     struct sockaddr_in serveraddr;
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -76,7 +78,7 @@ int main(int argc, char* argv[]) {
     } else {
         printf("connection established successfully\n");
 
-        char buff[500];
+        char buff[BUFSIZE];
         int read;
         memset(buff, '\0', sizeof(buff));
         recv(sockfd, buff, sizeof(buff), 0);
