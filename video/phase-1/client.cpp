@@ -26,6 +26,8 @@ using namespace cv;
 int voice_chat = 0;
 char key;
 
+int capDev = 0;
+VideoCapture cap(capDev);
 
 /* The sample type to use */
 static const pa_sample_spec ss1 = {
@@ -64,7 +66,56 @@ void handle_sigint(int sig) {
     }
 }
 
-void* send_thread_func(void *fd) {
+void* send_video_thread_func(void *fd) {
+    int sckfd = *((int *)fd);
+
+    Mat img, imgGray;
+    img = Mat::zeros(480 , 640, CV_8UC1);   
+     //make it continuous
+    if (!img.isContinuous()) {
+        img = img.clone();
+    }
+
+    int imgSize = img.total() * img.elemSize();
+    int bytes = 0;
+
+    //make img continuos
+    if ( ! img.isContinuous() ) { 
+          img = img.clone();
+          imgGray = img.clone();
+    }
+        
+    std::cout << "Image Size:" << imgSize << std::endl;
+
+    while(1) {
+        char buff[BUFSIZE];
+        char buff2[BUFSIZE];
+
+        if (voice_chat) {
+            // video code
+            /* get a frame from camera */
+            cap >> img;
+        
+            //do video processing here 
+            cvtColor(img, imgGray, CV_BGR2GRAY);
+
+            //send processed image
+            if ((bytes = send(sckfd, imgGray.data, imgSize, 0)) < 0){
+                std::cerr << "send_video not working" << std::endl;
+                std::cerr << "bytes = " << bytes << std::endl;
+                break;
+            }
+        } else {
+            printf("Enter your message: ");
+            fgets(buff, BUFSIZE, stdin);
+            write(sckfd, buff, sizeof(buff));
+        }
+    }
+}
+
+
+void* send_audio_thread_func(void *fd) {
+    int sckfd = *((int *)fd);
     if (voice_chat) {
         /* Create the recording stream */
         if (!(s1 = pa_simple_new(NULL, "VOIP", PA_STREAM_RECORD, NULL, "record", &ss1, NULL, NULL, &error1))) {
@@ -83,11 +134,11 @@ void* send_thread_func(void *fd) {
                 fprintf(stderr, __FILE__": pa_simple_read() failed: %s\n", pa_strerror(error1));
                 goto finish;
             }
-            write(sockfd, buff2, sizeof(buff2));
+            write(sckfd, buff2, sizeof(buff2));
         } else {
             printf("Enter your message: ");
             fgets(buff, BUFSIZE, stdin);
-            write(sockfd, buff, sizeof(buff));
+            write(sckfd, buff, sizeof(buff));
         }
     }
 
@@ -200,18 +251,21 @@ int main(int argc, char* argv[]) {
 
     // Create two threads - one for recieving messages and one for sending message
     // to the server.
-    // pthread_t send_threadid;
-    pthread_t rcv_video_threadid;
-    pthread_t rcv_audio_threadid;
+    pthread_t send_video_threadid;
+    pthread_t send_audio_threadid;
+    // pthread_t rcv_video_threadid;
+    // pthread_t rcv_audio_threadid;
 
-    // pthread_create(&send_threadid, NULL, send_thread_func, &sockfd);
-    pthread_create(&rcv_video_threadid, NULL, rcv_video_thread_func, &sockfd);
-    pthread_create(&rcv_audio_threadid, NULL, rcv_audio_thread_func, &sockfd1);
+    pthread_create(&send_video_threadid, NULL, send_video_thread_func, &sockfd);
+    pthread_create(&send_audio_threadid, NULL, send_audio_thread_func, &sockfd1);
+    // pthread_create(&rcv_video_threadid, NULL, rcv_video_thread_func, &sockfd);
+    // pthread_create(&rcv_audio_threadid, NULL, rcv_audio_thread_func, &sockfd1);
 
     // join the two threads
-    // pthread_join(send_threadid, NULL);
-    pthread_join(rcv_video_threadid, NULL);
-    pthread_join(rcv_audio_threadid, NULL);
+    pthread_join(send_video_threadid, NULL);
+    pthread_join(send_audio_threadid, NULL);
+    // pthread_join(rcv_video_threadid, NULL);
+    // pthread_join(rcv_audio_threadid, NULL);
     close(sockfd);
     close(sockfd1);
 }
