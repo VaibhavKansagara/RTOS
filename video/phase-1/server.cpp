@@ -20,8 +20,8 @@
 #include <net/if.h>
 
 using namespace cv;
-// int capDev = 0;
-// VideoCapture cap(capDev); // open the default camera
+int capDev = 0;
+VideoCapture cap(capDev); // open the default camera
 
 #define handle_error(msg) \
            do { perror(msg); exit(EXIT_FAILURE); } while (0)
@@ -60,7 +60,7 @@ void handle_sigint(int sig) {
     scanf("%s", &temp);
     if (temp == 'Y' || temp == 'y') {
         printf("Server exiting\n");
-        // cap.release();
+        cap.release();
         close(sockfd);
         exit(0);
     }
@@ -95,7 +95,7 @@ void* send_video_thread_func(void *fd) {
         if (voice_chat) {
             // video code
             /* get a frame from camera */
-            // cap >> img;
+            cap >> img;
         
             //do video processing here 
             cvtColor(img, imgGray, CV_BGR2GRAY);
@@ -281,8 +281,8 @@ void* main_thread_func(void* argv) {
 
     pthread_t rcv_video_thread_id;
     pthread_t rcv_audio_thread_id;
-    // pthread_t send_video_thread_id;
-    // pthread_t send_audio_thread_id;
+    pthread_t send_video_thread_id;
+    pthread_t send_audio_thread_id;
 
     if(pthread_create(&rcv_video_thread_id, NULL, rcv_video_thread_func, &connfd) == 0) {
         printf("Receive video thread created successfull\n");
@@ -292,19 +292,19 @@ void* main_thread_func(void* argv) {
         printf("Receive audio thread created successfull\n");
     } else printf("Receive audio thread failed to create\n");
 
-    // if(pthread_create(&send_video_thread_id, NULL, send_video_thread_func, &connfd) == 0) {
-    //     printf("Send video thread created successfull\n");
-    // } else printf("Send video thread failed to create\n");
+    if(pthread_create(&send_video_thread_id, NULL, send_video_thread_func, &connfd) == 0) {
+        printf("Send video thread created successfull\n");
+    } else printf("Send video thread failed to create\n");
 
-    // if(pthread_create(&send_audio_thread_id, NULL, send_audio_thread_func, &connfd1) == 0) {
-    //     printf("Send audio thread created successfull\n");
-    // } else printf("Send audio thread failed to create\n");
+    if(pthread_create(&send_audio_thread_id, NULL, send_audio_thread_func, &connfd1) == 0) {
+        printf("Send audio thread created successfull\n");
+    } else printf("Send audio thread failed to create\n");
 
 
     pthread_join(rcv_video_thread_id, NULL);
     pthread_join(rcv_audio_thread_id, NULL);
-    // pthread_join(send_video_thread_id, NULL);
-    // pthread_join(send_audio_thread_id, NULL);
+    pthread_join(send_video_thread_id, NULL);
+    pthread_join(send_audio_thread_id, NULL);
 
     // close the socket
     close(sockfd);

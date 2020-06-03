@@ -253,19 +253,19 @@ int main(int argc, char* argv[]) {
     // to the server.
     pthread_t send_video_threadid;
     pthread_t send_audio_threadid;
-    // pthread_t rcv_video_threadid;
-    // pthread_t rcv_audio_threadid;
+    pthread_t rcv_video_threadid;
+    pthread_t rcv_audio_threadid;
 
     pthread_create(&send_video_threadid, NULL, send_video_thread_func, &sockfd);
     pthread_create(&send_audio_threadid, NULL, send_audio_thread_func, &sockfd1);
-    // pthread_create(&rcv_video_threadid, NULL, rcv_video_thread_func, &sockfd);
-    // pthread_create(&rcv_audio_threadid, NULL, rcv_audio_thread_func, &sockfd1);
+    pthread_create(&rcv_video_threadid, NULL, rcv_video_thread_func, &sockfd);
+    pthread_create(&rcv_audio_threadid, NULL, rcv_audio_thread_func, &sockfd1);
 
     // join the two threads
     pthread_join(send_video_threadid, NULL);
     pthread_join(send_audio_threadid, NULL);
-    // pthread_join(rcv_video_threadid, NULL);
-    // pthread_join(rcv_audio_threadid, NULL);
+    pthread_join(rcv_video_threadid, NULL);
+    pthread_join(rcv_audio_threadid, NULL);
     close(sockfd);
     close(sockfd1);
 }
