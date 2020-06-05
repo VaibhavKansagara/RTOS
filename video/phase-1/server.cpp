@@ -18,6 +18,7 @@
 #include <iostream>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include "rsa.h"
 
 using namespace cv;
 int capDev = 0;
@@ -54,6 +55,17 @@ int sockfd,sockfd1;
 int voice_chat = 0;
 char key;
 
+// We need client's public key to encrypt messages
+// client's public key
+struct public_key_class client_pub[1];
+
+// server's public and private key
+struct private_key_class* server_priv;
+struct public_key_class* server_pub;
+struct gof {
+    int p;
+};
+
 void handle_sigint(int sig) {
     char temp;
     printf("exit Y/N: ");
@@ -66,11 +78,29 @@ void handle_sigint(int sig) {
     }
 }
 
+void* exchange_public_key(void* fd) {
+    int sckfd = *((int *)fd);
+    // std::cout << server_pub->modulus << " " << server_pub->exponent <<std::endl;
+    int bytes = 0;
+    // send server's public key
+    if ((bytes = send(sckfd, server_pub, sizeof(struct public_key_class), 0)) < 0){
+        std::cerr << "Not able to send server's public key" << std::endl;
+        exit(1);
+    }
+    //receive client's public key
+    if ((bytes = recv(sckfd, client_pub, sizeof(struct public_key_class), 0)) < 0){
+        std::cerr << "Not able to receive client's public key" << std::endl;
+        exit(1);
+    }
+
+    // std::cout << client_pub->modulus << " " << client_pub->exponent <<std::endl;
+}
+
 void* send_video_thread_func(void *fd) {
     int sckfd = *((int *)fd);
-
+    
     Mat img, imgGray;
-    img = Mat::zeros(480 , 640, CV_8UC1);   
+    img = Mat::zeros(240 , 320, CV_8UC1);   
      //make it continuous
     if (!img.isContinuous()) {
         img = img.clone();
@@ -85,26 +115,36 @@ void* send_video_thread_func(void *fd) {
           img = img.clone();
           imgGray = img.clone();
     }
-        
-    std::cout << "Image Size:" << imgSize << std::endl;
 
+    std::cout << "Image Size:" << imgSize << std::endl;
+    cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('H', '2', '6', '4'));
+    cap.set(CV_CAP_PROP_FRAME_HEIGHT,240);
+    cap.set(CV_CAP_PROP_FRAME_WIDTH,320);
     while(1) {
         char buff[BUFSIZE];
         char buff2[BUFSIZE];
+        uchar videobuff[imgSize];
 
         if (voice_chat) {
             // video code
-            /* get a frame from camera */
+            // get a frame from camera 
             cap >> img;
         
             //do video processing here 
             cvtColor(img, imgGray, CV_BGR2GRAY);
 
+            // memcpy(videobuff, imgGray.data, imgSize);
+            long long *encrypted = rsa_encrypt(imgGray.data, sizeof(videobuff), client_pub);
+            // std::cout << 8*imgSize << " " << sizeof(long long) * sizeof(videobuff) << std::endl;
             //send processed image
-            if ((bytes = send(sckfd, imgGray.data, imgSize, 0)) < 0){
+            if ((bytes = send(sckfd, encrypted, 8*imgSize, 0)) < 0){
                  std::cerr << "bytes = " << bytes << std::endl;
                  break;
             }
+            // if ((bytes = send(sckfd, videobuff, imgSize, 0)) < 0){
+            //      std::cerr << "bytes = " << bytes << std::endl;
+            //      break;
+            // }
         } else {
             printf("Enter your message: ");
             fgets(buff, BUFSIZE, stdin);
@@ -279,18 +319,23 @@ void* main_thread_func(void* argv) {
         printf("server1 accepted the client\n");
     } else printf("server1 accept failed\n");
 
-    pthread_t rcv_video_thread_id;
-    pthread_t rcv_audio_thread_id;
+
+    pthread_t exchange_id;
+    pthread_create(&exchange_id, NULL, exchange_public_key, &connfd);    
+    pthread_join(exchange_id, NULL);
+
+    // pthread_t rcv_video_thread_id;
+    // pthread_t rcv_audio_thread_id;
     pthread_t send_video_thread_id;
     pthread_t send_audio_thread_id;
 
-    if(pthread_create(&rcv_video_thread_id, NULL, rcv_video_thread_func, &connfd) == 0) {
-        printf("Receive video thread created successfull\n");
-    } else printf("Receive video thread failed to create\n");
+    // if(pthread_create(&rcv_video_thread_id, NULL, rcv_video_thread_func, &connfd) == 0) {
+    //     printf("Receive video thread created successfull\n");
+    // } else printf("Receive video thread failed to create\n");
 
-    if(pthread_create(&rcv_audio_thread_id, NULL, rcv_audio_thread_func, &connfd1) == 0) {
-        printf("Receive audio thread created successfull\n");
-    } else printf("Receive audio thread failed to create\n");
+    // if(pthread_create(&rcv_audio_thread_id, NULL, rcv_audio_thread_func, &connfd1) == 0) {
+    //     printf("Receive audio thread created successfull\n");
+    // } else printf("Receive audio thread failed to create\n");
 
     if(pthread_create(&send_video_thread_id, NULL, send_video_thread_func, &connfd) == 0) {
         printf("Send video thread created successfull\n");
@@ -301,8 +346,8 @@ void* main_thread_func(void* argv) {
     } else printf("Send audio thread failed to create\n");
 
 
-    pthread_join(rcv_video_thread_id, NULL);
-    pthread_join(rcv_audio_thread_id, NULL);
+    // pthread_join(rcv_video_thread_id, NULL);
+    // pthread_join(rcv_audio_thread_id, NULL);
     pthread_join(send_video_thread_id, NULL);
     pthread_join(send_audio_thread_id, NULL);
 
@@ -312,6 +357,9 @@ void* main_thread_func(void* argv) {
 }
 
 int main(int argc, char* argv[]) {
+    server_pub = (struct public_key_class*)malloc(sizeof(struct public_key_class));
+    server_priv = (struct private_key_class*)malloc(sizeof(struct private_key_class));
+    rsa_gen_keys(server_pub, server_priv, PRIME_SOURCE_FILE);
     signal(SIGINT, handle_sigint);
     pthread_t main_thread_id;
 
