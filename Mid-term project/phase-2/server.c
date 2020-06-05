@@ -15,7 +15,9 @@
 
 #define BUFSIZE 512
 
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; 
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_t client_thread_ids[100];
+int no_threads=0;
 
 // initially voice chat is disabled.
 int voice_chat = 0;
@@ -48,17 +50,6 @@ struct Message {
     int group_id;
     char client_name[50];
 };
-
-void handle_sigint(int sig) {
-    char temp;
-    printf("exit Y/N: ");
-    scanf("%s", &temp);
-    if (temp == 'Y' || temp == 'y') {
-        printf("Server exiting\n");
-        close(sockfd);
-        exit(0);
-    }
-}
 
 
 // ------------------------------Queue implementation
@@ -273,26 +264,55 @@ void* main_thread_func(void* argv) {
     else
         printf("Server listening..\n");
 
-    pthread_t client_thread_ids[100];
-    int i = 0;
     while(1) {
         socklen_t addrsize = sizeof(cli);
         if ((connfd = accept(sockfd, (struct sockaddr*)&cli, &(addrsize))) >= 0) {
             printf("server accepted the client\n");
         } else printf("server accept failed\n");
         // Now create the thread for each client request accepted
-        if(pthread_create(&client_thread_ids[i++], NULL, client_thread, &connfd) == 0) {
+        if(pthread_create(&client_thread_ids[no_threads++], NULL, client_thread, &connfd) == 0) {
             printf("Thread created successfull\n");
         } else printf("Thread failed to create\n");
     }
 
     // join all the threads before terminating the main thread.
-    for(int j = 0; j < i; j++) {
+    for(int j = 0; j < no_threads; j++) {
         pthread_join(client_thread_ids[j], NULL);
     }
 
     // close the socket
     close(sockfd);
+}
+
+void send_to_grp(int id) {
+    struct Message msg;
+    msg.group_id = id;
+    strcpy(msg.client_name, "exit");
+    strcpy(msg.message, "exit");
+    struct QNode* qnode = (struct QNode*)malloc(sizeof(struct QNode));
+    qnode->key = msg;
+    qnode->next = NULL;
+    pthread_mutex_lock(&q->q_lock);
+    enQueue(qnode);
+    pthread_mutex_unlock(&q->q_lock);
+}
+
+void handle_sigint(int sig) {
+    char temp;
+    printf("exit Y/N: ");
+    scanf("%s", &temp);
+    if (temp == 'Y' || temp == 'y') {
+        printf("Server exiting\n");
+
+        send_to_grp(0);
+        send_to_grp(1);
+        send_to_grp(2);
+        send_to_grp(3);
+
+        while(q->front != NULL) {}
+        close(sockfd);
+        exit(0);
+    }
 }
 
 int main(int argc, char* argv[]) {

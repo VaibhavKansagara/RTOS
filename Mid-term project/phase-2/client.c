@@ -112,6 +112,9 @@ void* rcv_thread_func(void *fd) {
     while(1) {
         struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
         recv(sckfd, t_m, sizeof(struct time_message), 0);
+        if (strcmp(t_m->buff, "exit: exit") == 0) {
+            exit(0);
+        }
         if (voice_chat) {
             /* ... and play it */
             if (pa_simple_write(s2, t_m->voice_buff, (size_t) sizeof(t_m->voice_buff), &error2) < 0) {
