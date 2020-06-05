@@ -48,14 +48,15 @@ int sockfd;
 void handle_sigint(int sig) {
     char buff[BUFSIZE];
     memset(buff, '\0', sizeof(buff));
-    char temp;
+    char temp[5];
     printf("exit Y/N: ");
-    scanf("%s", &temp);
+    // scanf("%s", temp);
+    fgets(temp, 5, stdin);
     strcpy(buff, "exit");
     struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
     strcpy(t_m->buff, buff);
     t_m->t = gettime();
-    if (temp == 'Y' || temp == 'y') {
+    if (temp[0] == 'Y' || temp[0] == 'y') {
         send(sockfd, t_m, sizeof(struct time_message), 0);
         exit(0);
     }
@@ -81,8 +82,10 @@ void* send_thread_func(void *fd) {
                 goto finish;
             }
         } else {
-            printf("Enter your message: ");
-            scanf("%s", buff);
+            // printf("Enter your message: ");
+            // scanf("%s", buff);
+            fgets(buff, BUFSIZE, stdin);
+            // scanf("%[^\n]s", buff);
         }
 
         struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));

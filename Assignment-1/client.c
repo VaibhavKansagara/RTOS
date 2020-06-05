@@ -35,7 +35,8 @@ void* send_thread_func(void *fd) {
     while(1) {
         memset(buff, '\0', sizeof(buff));
         printf("Enter your message: ");
-        scanf("%s", buff);
+        // scanf("%[^\n]s", buff);
+        fgets(buff, BUFSIZE, stdin);
         struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
         strcpy(t_m->buff, buff);
         t_m->t = gettime();
