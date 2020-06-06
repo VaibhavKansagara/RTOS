@@ -13,7 +13,7 @@
 #define handle_error(msg) \
            do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
-#define BUFSIZE 512
+#define BUFSIZE 1024
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_t client_thread_ids[100];

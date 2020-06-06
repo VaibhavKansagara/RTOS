@@ -15,7 +15,7 @@
 #include <pulse/gccmacro.h>
 #include <pulse/pulseaudio.h>
 
-#define BUFSIZE 512
+#define BUFSIZE 1024
 
 int voice_chat = 0;
 
@@ -116,6 +116,7 @@ void* rcv_thread_func(void *fd) {
             exit(0);
         }
         if (voice_chat) {
+            // printf("levevlej\n");
             /* ... and play it */
             if (pa_simple_write(s2, t_m->voice_buff, (size_t) sizeof(t_m->voice_buff), &error2) < 0) {
                 fprintf(stderr, __FILE__": pa_simple_write() failed: %s\n", pa_strerror(error2));
@@ -125,6 +126,7 @@ void* rcv_thread_func(void *fd) {
             printf("%s", t_m->buff);
         }
     }
+
     /* Make sure that every single sample was played */
     if (pa_simple_drain(s2, &error2) < 0) {
         fprintf(stderr, __FILE__": pa_simple_drain() failed: %s\n", pa_strerror(error2));
