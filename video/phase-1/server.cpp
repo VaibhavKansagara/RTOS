@@ -62,9 +62,6 @@ struct public_key_class client_pub[1];
 // server's public and private key
 struct private_key_class* server_priv;
 struct public_key_class* server_pub;
-struct gof {
-    int p;
-};
 
 void handle_sigint(int sig) {
     char temp;
@@ -117,7 +114,7 @@ void* send_video_thread_func(void *fd) {
     }
 
     std::cout << "Image Size:" << imgSize << std::endl;
-    cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('H', '2', '6', '4'));
+    cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('D', 'I', 'V', 'X'));
     cap.set(CV_CAP_PROP_FRAME_HEIGHT,240);
     cap.set(CV_CAP_PROP_FRAME_WIDTH,320);
     while(1) {

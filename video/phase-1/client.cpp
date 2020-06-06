@@ -183,7 +183,7 @@ finish:
 // Handler for receiver threads
 void* rcv_video_thread_func(void* connfd) {
     int sckfd = *((int *)connfd);
-    
+
     Mat img;
     img = Mat::zeros(240 , 320, CV_8UC1);
     int imgSize = img.total() * img.elemSize();
