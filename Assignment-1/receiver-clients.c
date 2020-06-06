@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
     } else {
         printf("connection established successfully\n");
 
-        char buff[500];
+        char buff[50];
         memset(buff, '\0', sizeof(buff));
         recv(sockfd, buff, sizeof(buff), 0);
         printf("%s\n", buff);

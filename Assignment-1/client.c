@@ -10,7 +10,7 @@
 #include<signal.h>
 #include "common.h"
 
-#define BUFSIZE 512
+#define BUFSIZE 50
 
 int sockfd;
 void handle_sigint(int sig) {
@@ -35,8 +35,7 @@ void* send_thread_func(void *fd) {
     while(1) {
         memset(buff, '\0', sizeof(buff));
         printf("Enter your message: ");
-        // scanf("%[^\n]s", buff);
-        fgets(buff, BUFSIZE, stdin);
+        scanf("%s", buff);
         struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
         strcpy(t_m->buff, buff);
         t_m->t = gettime();

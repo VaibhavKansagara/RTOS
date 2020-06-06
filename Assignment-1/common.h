@@ -16,7 +16,7 @@ struct t_format {
 
 struct time_message {
     struct t_format t;
-    char buff[500];
+    char buff[50];
 };
 
 static struct t_format gettime () {

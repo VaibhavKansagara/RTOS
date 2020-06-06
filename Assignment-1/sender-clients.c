@@ -26,7 +26,7 @@ void handle_sigint(int sig) {
 
 void* send_thread_func(void *fd) {
     int sckfd = *((int *)fd);
-    char buff[500] = "veirviehfr";
+    char buff[50] = "veirviehfr";
     while(1) {
         struct time_message* t_m = (struct time_message*)malloc(sizeof(struct time_message));
         strcpy(t_m->buff, buff);
@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
     } else {
         printf("connection established successfully\n");
 
-        char buff[500];
+        char buff[50];
         memset(buff, '\0', sizeof(buff));
         recv(sockfd, buff, sizeof(buff), 0);
         printf("%s\n", buff);

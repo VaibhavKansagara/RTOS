@@ -10,7 +10,7 @@
 #include<signal.h>
 #include"common.h"
 
-#define BUFSIZE 512
+#define BUFSIZE 50
 
 #define handle_error(msg) \
            do { perror(msg); exit(EXIT_FAILURE); } while (0)
