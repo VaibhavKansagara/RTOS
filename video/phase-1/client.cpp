@@ -112,12 +112,9 @@ void* send_video_thread_func(void *fd) {
 
     std::cout << "Image Size:" << imgSize << std::endl;
     cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('D', 'I', 'V', 'X'));
-    // cap.set(CV_CAP_PROP_FRAME_HEIGHT,240);
-    // cap.set(CV_CAP_PROP_FRAME_WIDTH,320);
     while(1) {
         char buff[BUFSIZE];
         char buff2[BUFSIZE];
-        uchar videobuff[imgSize];
 
         if (voice_chat) {
             // video code
@@ -127,11 +124,23 @@ void* send_video_thread_func(void *fd) {
             //do video processing here 
             cvtColor(img, imgGray, CV_BGR2GRAY);
 
-            // memcpy(videobuff, imgGray.data, imgSize);
-            long long *encrypted = rsa_encrypt(imgGray.data, sizeof(videobuff), server_pub);
-            // std::cout << 8*imgSize << " " << sizeof(long long) * sizeof(videobuff) << std::endl;
+            std::vector<uchar> buff_v;//buffer for encoding
+            std::vector<int> param(2);
+            param[0] = cv::IMWRITE_JPEG_QUALITY;
+            param[1] = 80;//default(95) 0-100
+            cv::imencode(".jpg", imgGray, buff_v, param);
+
+            int size_buff = buff_v.size();
+            std::cout << size_buff << std::endl;
+
+            if ((bytes = send(sckfd, &size_buff, sizeof(int), 0)) < 0){
+                 std::cerr << "Size of the buffer not sent correctly"<< std::endl;
+                 break;
+            }
+            
+            long long *encrypted = rsa_encrypt(buff_v, size_buff, server_pub);
             //send processed image
-            if ((bytes = send(sckfd, encrypted, 8*imgSize, 0)) < 0){
+            if ((bytes = send(sckfd, encrypted, 8 * size_buff, 0)) < 0){
                  std::cerr << "bytes = " << bytes << std::endl;
                  break;
             }

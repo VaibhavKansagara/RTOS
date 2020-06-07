@@ -4,6 +4,7 @@
 #include <math.h>
 #include <time.h>
 #include <string.h>
+#include <vector>
 
 
 char buffer[1024];
@@ -145,7 +146,7 @@ void rsa_gen_keys(struct public_key_class *pub, struct private_key_class *priv, 
 }
 
 
-long long *rsa_encrypt(const unsigned char *message, const unsigned long message_size, 
+long long *rsa_encrypt(const std::vector<unsigned char>& message, const unsigned long message_size, 
                      const struct public_key_class *pub)
 {
   long long *encrypted = new long long[message_size];

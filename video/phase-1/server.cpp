@@ -94,55 +94,55 @@ void* exchange_public_key(void* fd) {
 }
 
 void* send_video_thread_func(void *fd) {
-    int sckfd = *((int *)fd);
+    // int sckfd = *((int *)fd);
     
-    Mat img, imgGray;
-    img = Mat::zeros(480 , 640, CV_8UC1);   
-     //make it continuous
-    if (!img.isContinuous()) {
-        img = img.clone();
-        imgGray = img.clone();
-    }
+    // Mat img, imgGray;
+    // img = Mat::zeros(480 , 640, CV_8UC1);   
+    //  //make it continuous
+    // if (!img.isContinuous()) {
+    //     img = img.clone();
+    //     imgGray = img.clone();
+    // }
 
-    int imgSize = img.total() * img.elemSize();
-    int bytes = 0;
-    int key;
+    // int imgSize = img.total() * img.elemSize();
+    // int bytes = 0;
+    // int key;
 
-    std::cout << "Image Size:" << imgSize << std::endl;
-    // cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('D', 'I', 'V', 'X'));
-    // cap.set(CV_CAP_PROP_FRAME_HEIGHT,240);
-    // cap.set(CV_CAP_PROP_FRAME_WIDTH,320);
-    while(1) {
-        char buff[BUFSIZE];
-        char buff2[BUFSIZE];
-        uchar videobuff[imgSize];
+    // std::cout << "Image Size:" << imgSize << std::endl;
+    // // cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('D', 'I', 'V', 'X'));
+    // // cap.set(CV_CAP_PROP_FRAME_HEIGHT,240);
+    // // cap.set(CV_CAP_PROP_FRAME_WIDTH,320);
+    // while(1) {
+    //     char buff[BUFSIZE];
+    //     char buff2[BUFSIZE];
+    //     uchar videobuff[imgSize];
 
-        if (voice_chat) {
-            // video code
-            // get a frame from camera 
-            // cap >> img;
+    //     if (voice_chat) {
+    //         // video code
+    //         // get a frame from camera 
+    //         // cap >> img;
         
-            //do video processing here 
-            cvtColor(img, imgGray, CV_BGR2GRAY);
+    //         //do video processing here 
+    //         cvtColor(img, imgGray, CV_BGR2GRAY);
 
-            // memcpy(videobuff, imgGray.data, imgSize);
-            long long *encrypted = rsa_encrypt(imgGray.data, sizeof(videobuff), client_pub);
-            // std::cout << 8*imgSize << " " << sizeof(long long) * sizeof(videobuff) << std::endl;
-            //send processed image
-            if ((bytes = send(sckfd, encrypted, 8*imgSize, 0)) < 0){
-                 std::cerr << "bytes = " << bytes << std::endl;
-                 break;
-            }
-            // if ((bytes = send(sckfd, videobuff, imgSize, 0)) < 0){
-            //      std::cerr << "bytes = " << bytes << std::endl;
-            //      break;
-            // }
-        } else {
-            printf("Enter your message: ");
-            fgets(buff, BUFSIZE, stdin);
-            write(sckfd, buff, sizeof(buff));
-        }
-    }
+    //         // memcpy(videobuff, imgGray.data, imgSize);
+    //         long long *encrypted = rsa_encrypt(imgGray.data, sizeof(videobuff), client_pub);
+    //         // std::cout << 8*imgSize << " " << sizeof(long long) * sizeof(videobuff) << std::endl;
+    //         //send processed image
+    //         if ((bytes = send(sckfd, encrypted, 8*imgSize, 0)) < 0){
+    //              std::cerr << "bytes = " << bytes << std::endl;
+    //              break;
+    //         }
+    //         // if ((bytes = send(sckfd, videobuff, imgSize, 0)) < 0){
+    //         //      std::cerr << "bytes = " << bytes << std::endl;
+    //         //      break;
+    //         // }
+    //     } else {
+    //         printf("Enter your message: ");
+    //         fgets(buff, BUFSIZE, stdin);
+    //         write(sckfd, buff, sizeof(buff));
+    //     }
+    // }
 }
 
 void* send_audio_thread_func(void *fd) {
@@ -196,19 +196,30 @@ void* rcv_video_thread_func(void* connfd) {
     // Now read the message from the client for infinite time
     // until he quits
     while(key != 'q') {
-        uchar videobuffer[imgSize];
-        long long encrypted[imgSize];
+        int buff_size;
+        if ((bytes = recv(sckfd, &buff_size, sizeof(int) , 0)) == -1) {
+            std::cerr << "recv failed, received bytes = " << bytes << std::endl;
+        }
+        long long encrypted[buff_size];
+        // std::cout << buff_size << std::endl;
+
         // std::cout << sizeof(encrypted) << " " << 8*imgSize << std::endl;
-        if ((bytes = recv(sckfd, encrypted, 8*imgSize , MSG_WAITALL)) == -1) {
+        if ((bytes = recv(sckfd, encrypted, 8 * buff_size, MSG_WAITALL)) == -1) {
             std::cerr << "recv failed, received bytes = " << bytes << std::endl;
         }
         // if ((bytes = recv(sckfd, videobuffer, imgSize , MSG_WAITALL)) == -1) {
         //     std::cerr << "recv failed, received bytes = " << bytes << std::endl;
         // }
-        uchar *decrypted = rsa_decrypt(encrypted, 8*imgSize, server_priv);
-        memcpy(iptr, decrypted, imgSize);
-        // memcpy(iptr, videobuffer, imgSize);
-        cv::imshow("CV Video Server", img);
+        uchar *decrypted = rsa_decrypt(encrypted, 8 * buff_size, server_priv);
+
+        std::vector<uchar> decrypted_vec(buff_size);
+        for (int i=0;i<buff_size;i++) {
+            decrypted_vec[i] = decrypted[i];
+        }
+
+        Mat resultimage;
+        resultimage = cv::imdecode(decrypted_vec, IMREAD_GRAYSCALE);
+        cv::imshow("CV Video Server", resultimage);
         key = cv::waitKey(10);
     }
 }
