@@ -67,7 +67,10 @@ struct Queue* q;
 // A utility function to create an empty queue 
 struct Queue* createQueue() 
 { 
-    q = (struct Queue*)malloc(sizeof(struct Queue)); 
+    q = (struct Queue*)malloc(sizeof(struct Queue));
+    if (q == NULL) {
+        
+    }
     q->front = q->rear = NULL; 
     return q; 
 } 

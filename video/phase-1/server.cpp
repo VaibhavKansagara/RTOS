@@ -21,8 +21,8 @@
 #include "rsa.h"
 
 using namespace cv;
-int capDev = 0;
-VideoCapture cap(capDev); // open the default camera
+// int capDev = 0;
+// VideoCapture cap(capDev); // open the default camera
 
 #define handle_error(msg) \
            do { perror(msg); exit(EXIT_FAILURE); } while (0)
@@ -60,8 +60,8 @@ char key;
 struct public_key_class client_pub[1];
 
 // server's public and private key
-struct private_key_class* server_priv;
-struct public_key_class* server_pub;
+struct private_key_class server_priv[1];
+struct public_key_class server_pub[1];
 
 void handle_sigint(int sig) {
     char temp;
@@ -69,7 +69,7 @@ void handle_sigint(int sig) {
     scanf("%s", &temp);
     if (temp == 'Y' || temp == 'y') {
         printf("Server exiting\n");
-        cap.release();
+        // cap.release();
         close(sockfd);
         exit(0);
     }
@@ -97,26 +97,21 @@ void* send_video_thread_func(void *fd) {
     int sckfd = *((int *)fd);
     
     Mat img, imgGray;
-    img = Mat::zeros(240 , 320, CV_8UC1);   
+    img = Mat::zeros(480 , 640, CV_8UC1);   
      //make it continuous
     if (!img.isContinuous()) {
         img = img.clone();
+        imgGray = img.clone();
     }
 
     int imgSize = img.total() * img.elemSize();
     int bytes = 0;
     int key;
 
-    //make img continuos
-    if ( ! img.isContinuous() ) { 
-          img = img.clone();
-          imgGray = img.clone();
-    }
-
     std::cout << "Image Size:" << imgSize << std::endl;
-    cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('D', 'I', 'V', 'X'));
-    cap.set(CV_CAP_PROP_FRAME_HEIGHT,240);
-    cap.set(CV_CAP_PROP_FRAME_WIDTH,320);
+    // cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('D', 'I', 'V', 'X'));
+    // cap.set(CV_CAP_PROP_FRAME_HEIGHT,240);
+    // cap.set(CV_CAP_PROP_FRAME_WIDTH,320);
     while(1) {
         char buff[BUFSIZE];
         char buff2[BUFSIZE];
@@ -125,7 +120,7 @@ void* send_video_thread_func(void *fd) {
         if (voice_chat) {
             // video code
             // get a frame from camera 
-            cap >> img;
+            // cap >> img;
         
             //do video processing here 
             cvtColor(img, imgGray, CV_BGR2GRAY);
@@ -201,9 +196,18 @@ void* rcv_video_thread_func(void* connfd) {
     // Now read the message from the client for infinite time
     // until he quits
     while(key != 'q') {
-        if ((bytes = recv(sckfd, iptr, imgSize , MSG_WAITALL)) == -1) {
+        uchar videobuffer[imgSize];
+        long long encrypted[imgSize];
+        // std::cout << sizeof(encrypted) << " " << 8*imgSize << std::endl;
+        if ((bytes = recv(sckfd, encrypted, 8*imgSize , MSG_WAITALL)) == -1) {
             std::cerr << "recv failed, received bytes = " << bytes << std::endl;
         }
+        // if ((bytes = recv(sckfd, videobuffer, imgSize , MSG_WAITALL)) == -1) {
+        //     std::cerr << "recv failed, received bytes = " << bytes << std::endl;
+        // }
+        uchar *decrypted = rsa_decrypt(encrypted, 8*imgSize, server_priv);
+        memcpy(iptr, decrypted, imgSize);
+        // memcpy(iptr, videobuffer, imgSize);
         cv::imshow("CV Video Server", img);
         key = cv::waitKey(10);
     }
@@ -321,32 +325,32 @@ void* main_thread_func(void* argv) {
     pthread_create(&exchange_id, NULL, exchange_public_key, &connfd);    
     pthread_join(exchange_id, NULL);
 
-    // pthread_t rcv_video_thread_id;
-    // pthread_t rcv_audio_thread_id;
-    pthread_t send_video_thread_id;
-    pthread_t send_audio_thread_id;
+    pthread_t rcv_video_thread_id;
+    pthread_t rcv_audio_thread_id;
+    // pthread_t send_video_thread_id;
+    // pthread_t send_audio_thread_id;
 
-    // if(pthread_create(&rcv_video_thread_id, NULL, rcv_video_thread_func, &connfd) == 0) {
-    //     printf("Receive video thread created successfull\n");
-    // } else printf("Receive video thread failed to create\n");
+    if(pthread_create(&rcv_video_thread_id, NULL, rcv_video_thread_func, &connfd) == 0) {
+        printf("Receive video thread created successfull\n");
+    } else printf("Receive video thread failed to create\n");
 
-    // if(pthread_create(&rcv_audio_thread_id, NULL, rcv_audio_thread_func, &connfd1) == 0) {
-    //     printf("Receive audio thread created successfull\n");
-    // } else printf("Receive audio thread failed to create\n");
+    if(pthread_create(&rcv_audio_thread_id, NULL, rcv_audio_thread_func, &connfd1) == 0) {
+        printf("Receive audio thread created successfull\n");
+    } else printf("Receive audio thread failed to create\n");
 
-    if(pthread_create(&send_video_thread_id, NULL, send_video_thread_func, &connfd) == 0) {
-        printf("Send video thread created successfull\n");
-    } else printf("Send video thread failed to create\n");
+    // if(pthread_create(&send_video_thread_id, NULL, send_video_thread_func, &connfd) == 0) {
+    //     printf("Send video thread created successfull\n");
+    // } else printf("Send video thread failed to create\n");
 
-    if(pthread_create(&send_audio_thread_id, NULL, send_audio_thread_func, &connfd1) == 0) {
-        printf("Send audio thread created successfull\n");
-    } else printf("Send audio thread failed to create\n");
+    // if(pthread_create(&send_audio_thread_id, NULL, send_audio_thread_func, &connfd1) == 0) {
+    //     printf("Send audio thread created successfull\n");
+    // } else printf("Send audio thread failed to create\n");
 
 
-    // pthread_join(rcv_video_thread_id, NULL);
-    // pthread_join(rcv_audio_thread_id, NULL);
-    pthread_join(send_video_thread_id, NULL);
-    pthread_join(send_audio_thread_id, NULL);
+    pthread_join(rcv_video_thread_id, NULL);
+    pthread_join(rcv_audio_thread_id, NULL);
+    // pthread_join(send_video_thread_id, NULL);
+    // pthread_join(send_audio_thread_id, NULL);
 
     // close the socket
     close(sockfd);
@@ -354,8 +358,6 @@ void* main_thread_func(void* argv) {
 }
 
 int main(int argc, char* argv[]) {
-    server_pub = (struct public_key_class*)malloc(sizeof(struct public_key_class));
-    server_priv = (struct private_key_class*)malloc(sizeof(struct private_key_class));
     rsa_gen_keys(server_pub, server_priv, PRIME_SOURCE_FILE);
     signal(SIGINT, handle_sigint);
     pthread_t main_thread_id;
