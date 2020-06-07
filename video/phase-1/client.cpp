@@ -27,8 +27,8 @@ using namespace cv;
 int voice_chat = 0;
 char key;
 
-int capDev = 0;
-VideoCapture cap(capDev);
+// int capDev = 0;
+// VideoCapture cap(capDev);
 
 /* The sample type to use */
 static const pa_sample_spec ss1 = {
@@ -111,7 +111,7 @@ void* send_video_thread_func(void *fd) {
     int key;
 
     std::cout << "Image Size:" << imgSize << std::endl;
-    cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('D', 'I', 'V', 'X'));
+    // cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('D', 'I', 'V', 'X'));
     while(1) {
         char buff[BUFSIZE];
         char buff2[BUFSIZE];
@@ -119,7 +119,7 @@ void* send_video_thread_func(void *fd) {
         if (voice_chat) {
             // video code
             // get a frame from camera 
-            cap >> img;
+            // cap >> img;
         
             //do video processing here 
             cvtColor(img, imgGray, CV_BGR2GRAY);
@@ -131,7 +131,6 @@ void* send_video_thread_func(void *fd) {
             cv::imencode(".jpg", imgGray, buff_v, param);
 
             int size_buff = buff_v.size();
-            std::cout << size_buff << std::endl;
 
             if ((bytes = send(sckfd, &size_buff, sizeof(int), 0)) < 0){
                  std::cerr << "Size of the buffer not sent correctly"<< std::endl;
@@ -144,10 +143,6 @@ void* send_video_thread_func(void *fd) {
                  std::cerr << "bytes = " << bytes << std::endl;
                  break;
             }
-            // if ((bytes = send(sckfd, videobuff, imgSize, 0)) < 0){
-            //      std::cerr << "bytes = " << bytes << std::endl;
-            //      break;
-            // }
         } else {
             printf("Enter your message: ");
             fgets(buff, BUFSIZE, stdin);
@@ -193,34 +188,31 @@ finish:
 void* rcv_video_thread_func(void* connfd) {
     int sckfd = *((int *)connfd);
 
-    Mat img;
-    img = Mat::zeros(480 , 640, CV_8UC1);
-    int imgSize = img.total() * img.elemSize();
-    uchar *iptr = img.data;
     int bytes = 0;
-    //make img continuos
-    if ( ! img.isContinuous() ) { 
-          img = img.clone();
-    }
-    std::cout << "Image Size:" << imgSize << std::endl;
-    namedWindow("CV Video Client",1);
+    namedWindow("CV Video Server",1);
 
     // Now read the message from the client for infinite time
     // until he quits
     while(key != 'q') {
-        uchar videobuffer[imgSize];
-        long long encrypted[imgSize];
-        // std::cout << sizeof(encrypted) << " " << 8*imgSize << std::endl;
-        if ((bytes = recv(sckfd, encrypted, 8*imgSize , MSG_WAITALL)) == -1) {
+        int buff_size;
+        if ((bytes = recv(sckfd, &buff_size, sizeof(int) , 0)) == -1) {
             std::cerr << "recv failed, received bytes = " << bytes << std::endl;
         }
-        // if ((bytes = recv(sckfd, videobuffer, imgSize , MSG_WAITALL)) == -1) {
-        //     std::cerr << "recv failed, received bytes = " << bytes << std::endl;
-        // }
-        uchar *decrypted = rsa_decrypt(encrypted, 8*imgSize, client_priv);
-        memcpy(iptr, decrypted, imgSize);
-        // memcpy(iptr, videobuffer, imgSize);
-        cv::imshow("CV Video Client", img);
+
+        long long encrypted[buff_size];
+        if ((bytes = recv(sckfd, encrypted, 8 * buff_size, MSG_WAITALL)) == -1) {
+            std::cerr << "recv failed, received bytes = " << bytes << std::endl;
+        }
+        uchar *decrypted = rsa_decrypt(encrypted, 8 * buff_size, client_priv);
+
+        std::vector<uchar> decrypted_vec(buff_size);
+        for (int i=0;i<buff_size;i++) {
+            decrypted_vec[i] = decrypted[i];
+        }
+
+        Mat resultimage;
+        resultimage = cv::imdecode(decrypted_vec, IMREAD_GRAYSCALE);
+        cv::imshow("CV Video Server", resultimage);
         key = cv::waitKey(10);
     }
 }
@@ -308,21 +300,21 @@ int main(int argc, char* argv[]) {
 
     // Create two threads - one for recieving messages and one for sending message
     // to the server.
-    pthread_t send_video_threadid;
-    pthread_t send_audio_threadid;
-    // pthread_t rcv_video_threadid;
-    // pthread_t rcv_audio_threadid;
+    // pthread_t send_video_threadid;
+    // pthread_t send_audio_threadid;
+    pthread_t rcv_video_threadid;
+    pthread_t rcv_audio_threadid;
 
-    pthread_create(&send_video_threadid, NULL, send_video_thread_func, &sockfd);
-    pthread_create(&send_audio_threadid, NULL, send_audio_thread_func, &sockfd1);
-    // pthread_create(&rcv_video_threadid, NULL, rcv_video_thread_func, &sockfd);
-    // pthread_create(&rcv_audio_threadid, NULL, rcv_audio_thread_func, &sockfd1);
+    // pthread_create(&send_video_threadid, NULL, send_video_thread_func, &sockfd);
+    // pthread_create(&send_audio_threadid, NULL, send_audio_thread_func, &sockfd1);
+    pthread_create(&rcv_video_threadid, NULL, rcv_video_thread_func, &sockfd);
+    pthread_create(&rcv_audio_threadid, NULL, rcv_audio_thread_func, &sockfd1);
 
     // join the two threads
-    pthread_join(send_video_threadid, NULL);
-    pthread_join(send_audio_threadid, NULL);
-    // pthread_join(rcv_video_threadid, NULL);
-    // pthread_join(rcv_audio_threadid, NULL);
+    // pthread_join(send_video_threadid, NULL);
+    // pthread_join(send_audio_threadid, NULL);
+    pthread_join(rcv_video_threadid, NULL);
+    pthread_join(rcv_audio_threadid, NULL);
     close(sockfd);
     close(sockfd1);
 }

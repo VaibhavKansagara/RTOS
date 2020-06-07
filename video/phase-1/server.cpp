@@ -21,8 +21,8 @@
 #include "rsa.h"
 
 using namespace cv;
-// int capDev = 0;
-// VideoCapture cap(capDev); // open the default camera
+int capDev = 0;
+VideoCapture cap(capDev); // open the default camera
 
 #define handle_error(msg) \
            do { perror(msg); exit(EXIT_FAILURE); } while (0)
@@ -94,55 +94,59 @@ void* exchange_public_key(void* fd) {
 }
 
 void* send_video_thread_func(void *fd) {
-    // int sckfd = *((int *)fd);
+    int sckfd = *((int *)fd);
     
-    // Mat img, imgGray;
-    // img = Mat::zeros(480 , 640, CV_8UC1);   
-    //  //make it continuous
-    // if (!img.isContinuous()) {
-    //     img = img.clone();
-    //     imgGray = img.clone();
-    // }
+    Mat img, imgGray;
+    img = Mat::zeros(480 , 640, CV_8UC1);   
+     //make it continuous
+    if (!img.isContinuous()) {
+        img = img.clone();
+        imgGray = img.clone();
+    }
 
-    // int imgSize = img.total() * img.elemSize();
-    // int bytes = 0;
-    // int key;
+    int imgSize = img.total() * img.elemSize();
+    int bytes = 0;
+    int key;
 
-    // std::cout << "Image Size:" << imgSize << std::endl;
-    // // cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('D', 'I', 'V', 'X'));
-    // // cap.set(CV_CAP_PROP_FRAME_HEIGHT,240);
-    // // cap.set(CV_CAP_PROP_FRAME_WIDTH,320);
-    // while(1) {
-    //     char buff[BUFSIZE];
-    //     char buff2[BUFSIZE];
-    //     uchar videobuff[imgSize];
+    std::cout << "Image Size:" << imgSize << std::endl;
+    cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('D', 'I', 'V', 'X'));
+    while(1) {
+        char buff[BUFSIZE];
+        char buff2[BUFSIZE];
 
-    //     if (voice_chat) {
-    //         // video code
-    //         // get a frame from camera 
-    //         // cap >> img;
+        if (voice_chat) {
+            // video code
+            // get a frame from camera 
+            cap >> img;
         
-    //         //do video processing here 
-    //         cvtColor(img, imgGray, CV_BGR2GRAY);
+            //do video processing here 
+            cvtColor(img, imgGray, CV_BGR2GRAY);
 
-    //         // memcpy(videobuff, imgGray.data, imgSize);
-    //         long long *encrypted = rsa_encrypt(imgGray.data, sizeof(videobuff), client_pub);
-    //         // std::cout << 8*imgSize << " " << sizeof(long long) * sizeof(videobuff) << std::endl;
-    //         //send processed image
-    //         if ((bytes = send(sckfd, encrypted, 8*imgSize, 0)) < 0){
-    //              std::cerr << "bytes = " << bytes << std::endl;
-    //              break;
-    //         }
-    //         // if ((bytes = send(sckfd, videobuff, imgSize, 0)) < 0){
-    //         //      std::cerr << "bytes = " << bytes << std::endl;
-    //         //      break;
-    //         // }
-    //     } else {
-    //         printf("Enter your message: ");
-    //         fgets(buff, BUFSIZE, stdin);
-    //         write(sckfd, buff, sizeof(buff));
-    //     }
-    // }
+            std::vector<uchar> buff_v;//buffer for encoding
+            std::vector<int> param(2);
+            param[0] = cv::IMWRITE_JPEG_QUALITY;
+            param[1] = 80;//default(95) 0-100
+            cv::imencode(".jpg", imgGray, buff_v, param);
+
+            int size_buff = buff_v.size();
+
+            if ((bytes = send(sckfd, &size_buff, sizeof(int), 0)) < 0){
+                 std::cerr << "Size of the buffer not sent correctly"<< std::endl;
+                 break;
+            }
+            
+            long long *encrypted = rsa_encrypt(buff_v, size_buff, client_pub);
+            //send processed image
+            if ((bytes = send(sckfd, encrypted, 8 * size_buff, 0)) < 0){
+                 std::cerr << "bytes = " << bytes << std::endl;
+                 break;
+            }
+        } else {
+            printf("Enter your message: ");
+            fgets(buff, BUFSIZE, stdin);
+            write(sckfd, buff, sizeof(buff));
+        }
+    }
 }
 
 void* send_audio_thread_func(void *fd) {
@@ -181,16 +185,7 @@ finish:
 void* rcv_video_thread_func(void* connfd) {
     int sckfd = *((int *)connfd);
 
-    Mat img;
-    img = Mat::zeros(480 , 640, CV_8UC1);
-    int imgSize = img.total() * img.elemSize();
-    uchar *iptr = img.data;
     int bytes = 0;
-    //make img continuos
-    if ( ! img.isContinuous() ) { 
-          img = img.clone();
-    }
-    std::cout << "Image Size:" << imgSize << std::endl;
     namedWindow("CV Video Server",1);
 
     // Now read the message from the client for infinite time
@@ -200,16 +195,11 @@ void* rcv_video_thread_func(void* connfd) {
         if ((bytes = recv(sckfd, &buff_size, sizeof(int) , 0)) == -1) {
             std::cerr << "recv failed, received bytes = " << bytes << std::endl;
         }
-        long long encrypted[buff_size];
-        // std::cout << buff_size << std::endl;
 
-        // std::cout << sizeof(encrypted) << " " << 8*imgSize << std::endl;
+        long long encrypted[buff_size];
         if ((bytes = recv(sckfd, encrypted, 8 * buff_size, MSG_WAITALL)) == -1) {
             std::cerr << "recv failed, received bytes = " << bytes << std::endl;
         }
-        // if ((bytes = recv(sckfd, videobuffer, imgSize , MSG_WAITALL)) == -1) {
-        //     std::cerr << "recv failed, received bytes = " << bytes << std::endl;
-        // }
         uchar *decrypted = rsa_decrypt(encrypted, 8 * buff_size, server_priv);
 
         std::vector<uchar> decrypted_vec(buff_size);
@@ -336,32 +326,32 @@ void* main_thread_func(void* argv) {
     pthread_create(&exchange_id, NULL, exchange_public_key, &connfd);    
     pthread_join(exchange_id, NULL);
 
-    pthread_t rcv_video_thread_id;
-    pthread_t rcv_audio_thread_id;
-    // pthread_t send_video_thread_id;
-    // pthread_t send_audio_thread_id;
+    // pthread_t rcv_video_thread_id;
+    // pthread_t rcv_audio_thread_id;
+    pthread_t send_video_thread_id;
+    pthread_t send_audio_thread_id;
 
-    if(pthread_create(&rcv_video_thread_id, NULL, rcv_video_thread_func, &connfd) == 0) {
-        printf("Receive video thread created successfull\n");
-    } else printf("Receive video thread failed to create\n");
+    // if(pthread_create(&rcv_video_thread_id, NULL, rcv_video_thread_func, &connfd) == 0) {
+    //     printf("Receive video thread created successfull\n");
+    // } else printf("Receive video thread failed to create\n");
 
-    if(pthread_create(&rcv_audio_thread_id, NULL, rcv_audio_thread_func, &connfd1) == 0) {
-        printf("Receive audio thread created successfull\n");
-    } else printf("Receive audio thread failed to create\n");
+    // if(pthread_create(&rcv_audio_thread_id, NULL, rcv_audio_thread_func, &connfd1) == 0) {
+    //     printf("Receive audio thread created successfull\n");
+    // } else printf("Receive audio thread failed to create\n");
 
-    // if(pthread_create(&send_video_thread_id, NULL, send_video_thread_func, &connfd) == 0) {
-    //     printf("Send video thread created successfull\n");
-    // } else printf("Send video thread failed to create\n");
+    if(pthread_create(&send_video_thread_id, NULL, send_video_thread_func, &connfd) == 0) {
+        printf("Send video thread created successfull\n");
+    } else printf("Send video thread failed to create\n");
 
-    // if(pthread_create(&send_audio_thread_id, NULL, send_audio_thread_func, &connfd1) == 0) {
-    //     printf("Send audio thread created successfull\n");
-    // } else printf("Send audio thread failed to create\n");
+    if(pthread_create(&send_audio_thread_id, NULL, send_audio_thread_func, &connfd1) == 0) {
+        printf("Send audio thread created successfull\n");
+    } else printf("Send audio thread failed to create\n");
 
 
-    pthread_join(rcv_video_thread_id, NULL);
-    pthread_join(rcv_audio_thread_id, NULL);
-    // pthread_join(send_video_thread_id, NULL);
-    // pthread_join(send_audio_thread_id, NULL);
+    // pthread_join(rcv_video_thread_id, NULL);
+    // pthread_join(rcv_audio_thread_id, NULL);
+    pthread_join(send_video_thread_id, NULL);
+    pthread_join(send_audio_thread_id, NULL);
 
     // close the socket
     close(sockfd);
